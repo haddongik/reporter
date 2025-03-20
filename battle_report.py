@@ -76,35 +76,19 @@ def generate_minimal_report(data):
                             elif state == "next":
                                 report.append("- 다음 행동 준비\n")
                             
-                            # 캐릭터 상태 정보 수집
-                            if "friends" in event:
-                                for char_id, char_info in event["friends"].items():
-                                    code = char_info.get("code", "")
-                                    hp = char_info.get("hp", 0)
-                                    
-                                    if code not in characters:
-                                        characters[code] = {"id": char_id, "last_hp": 0}
-                                    
-                                    # HP 변화 추적
-                                    if characters[code]["last_hp"] != 0 and characters[code]["last_hp"] != hp:
-                                        hp_change = hp - characters[code]["last_hp"]
-                                        if hp_change < 0:
-                                            report.append(f"- {code}의 HP가 {abs(hp_change)} 감소 (현재 HP: {hp})\n")
-                                        else:
-                                            report.append(f"- {code}의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
-                                    
-                                    characters[code]["last_hp"] = hp
-                            
-                            if "enemies" in event:
-                                enemies_data = event["enemies"]
-                                # enemies가 딕셔너리인 경우
-                                if isinstance(enemies_data, dict):
-                                    for enemy_id, enemy_info in enemies_data.items():
-                                        code = enemy_info.get("code", "")
-                                        hp = enemy_info.get("hp", 0)
+                            # 캐릭터 상태 정보 수집 -- 엑 오타...
+                            if "frineds" in event:
+                                friends_data = event["frineds"]
+                                if isinstance(friends_data, dict):
+                                    for char_id, char_info in friends_data.items():
+                                        code = char_info.get("code", "")
+                                        hp = char_info.get("hp", 0)
+                                        status = char_info.get("status")
                                         
                                         if code not in characters:
-                                            characters[code] = {"id": enemy_id, "last_hp": 0}
+                                            characters[code] = {"id": char_id, "last_hp": hp}
+                                            report.append(f"아군 {code}의 최초 HP : {abs(hp)}\n")
+                                            report.append(f"아군 {code}의 최초 STATUS : ()\n")
                                         
                                         # HP 변화 추적
                                         if characters[code]["last_hp"] != 0 and characters[code]["last_hp"] != hp:
@@ -115,26 +99,30 @@ def generate_minimal_report(data):
                                                 report.append(f"- {code}의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
                                         
                                         characters[code]["last_hp"] = hp
-                                # enemies가 리스트인 경우
-                                elif isinstance(enemies_data, list):
-                                    for i, enemy_info in enumerate(enemies_data):
-                                        if isinstance(enemy_info, dict):
-                                            enemy_id = enemy_info.get("id", f"enemy_{i}")
-                                            code = enemy_info.get("code", "")
-                                            hp = enemy_info.get("hp", 0)
-                                            
-                                            if code not in characters:
-                                                characters[code] = {"id": enemy_id, "last_hp": 0}
-                                            
-                                            # HP 변화 추적
-                                            if characters[code]["last_hp"] != 0 and characters[code]["last_hp"] != hp:
-                                                hp_change = hp - characters[code]["last_hp"]
-                                                if hp_change < 0:
-                                                    report.append(f"- {code}의 HP가 {abs(hp_change)} 감소 (현재 HP: {hp})\n")
-                                                else:
-                                                    report.append(f"- {code}의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
-                                            
-                                            characters[code]["last_hp"] = hp
+                            
+                            if "enemies" in event:
+                                enemies_data = event["enemies"]
+                                if isinstance(enemies_data, dict):
+                                    for enemy_id, enemy_info in enemies_data.items():
+                                        code = enemy_info.get("code", "")
+                                        hp = enemy_info.get("hp", 0)
+                                        status = char_info.get("status")
+                                        
+                                        if code not in characters:
+                                            characters[code] = {"id": enemy_id, "last_hp": hp}
+                                            report.append(f"적군 {code}의 최초 HP : {abs(hp)}\n")
+                                            report.append(f"적군 {code}의 최초 STATUS : ()\n")
+                                        
+                                        # HP 변화 추적
+                                        if characters[code]["last_hp"] != 0 and characters[code]["last_hp"] != hp:
+                                            hp_change = hp - characters[code]["last_hp"]
+                                            if hp_change < 0:
+                                                report.append(f"- {code}의 HP가 {abs(hp_change)} 감소 (현재 HP: {hp})\n")
+                                            else:
+                                                report.append(f"- {code}의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
+                                        
+                                        characters[code]["last_hp"] = hp
+
     
     # 전투 요약 정보
     report.append("\n## 전투 요약\n")
