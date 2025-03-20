@@ -1,0 +1,14 @@
+name: langchain-api
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - fastapi
+  - uvicorn
+  - openai
+  - python-dotenv
+  - pydantic
+  - pip
+  - pip:
+    - langchain 
