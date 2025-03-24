@@ -3,6 +3,7 @@ import json
 import base64
 import zlib
 from battle_report import generate_battle_report
+from app.services.langchain_service import LangChainService
 
 # 현재 실행 폴더 경로 가져오기
 current_folder = os.getcwd()
@@ -119,12 +120,16 @@ def main():
         print("JSON 데이터를 로드할 수 없습니다.")
         return
     
-    # 전투 리포트 생성 및 저장 (다양한 타입)
-    user_report_minimal = create_battle_report( json_data, "result_info", "user_record_minimal", "minimal", "user_report_minimal.txt" )
-    verify_report_minimal = create_battle_report( json_data, "result_info", "verify_record_minimal", "minimal", "verify_report_minimal.txt" )
+    # 전투 리포트 생성 및 저장 (minimal, regular)
+    # user_report_minimal = create_battle_report( json_data, "result_info", "user_record_minimal", "minimal", "user_report_minimal.txt" )
+    # verify_report_minimal = create_battle_report( json_data, "result_info", "verify_record_minimal", "minimal", "verify_report_minimal.txt" )
 
-    # user_report_regular = create_battle_report( json_data, "result_info", "user_record_minimal", "regular", "user_report_regular.txt" )
-    # verify_report_regular = create_battle_report( json_data, "result_info", "verify_record_minimal", "regular", "verify_report_regular.txt" )
+    user_report_regular = create_battle_report( json_data, "result_info", "user_record_history", "regular", "user_report_regular.txt" )
+    verify_report_regular = create_battle_report( json_data, "result_info", "verify_record_history", "regular", "verify_report_regular.txt" )
+
+    # langchain_test_service = LangChainService()
+    # analysis1 = langchain_test_service.process_analyze(user_report_regular,verify_report_regular)
+    # analysis2 = langchain_test_service.process_analyze_by_turn(user_report_regular,verify_report_regular)
 
 if __name__ == "__main__":
     main()
