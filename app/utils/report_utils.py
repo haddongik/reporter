@@ -177,16 +177,16 @@ def process_remove_state_event(event: dict) -> str:
 
 def get_current_states_summary() -> str:
 
-    summary = ["\n◆ 현재 상태 요약\n"]
+    summary = ["\n### 현재 상태 요약\n"]
     
     try:
         all_states = state_tracker.get_all_states()
         for uid in all_states:
             states = all_states[uid]
             if states:  # 상태가 있는 경우만 표시
-                summary.append(f"• UID:{uid}의 현재 상태: {', '.join(states)}\n")
+                summary.append(f" * UID:{uid}의 현재 상태: {', '.join(states)}\n")
     except Exception as e:
-        summary.append(f"• 상태 정보 처리 중 오류 발생: {str(e)}\n")
+        summary.append(f"* 상태 정보 처리 중 오류 발생: {str(e)}\n")
     
     return "".join(summary) if len(summary) > 1 else ""
 

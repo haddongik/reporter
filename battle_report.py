@@ -28,6 +28,12 @@ def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bo
         for sub_history in turn_data["history"]:
             if "sub_owner_code" in sub_history:
                 report.append(f"# {sub_history['sub_owner_code']}의 행동\n")
+
+                # 상태 요약 추가
+                if use_effect_info:
+                    state_summary = get_current_states_summary()
+                    if state_summary:
+                        report.append(state_summary)
             
             if "history" in sub_history:
                 for event in sub_history["history"]:
@@ -82,7 +88,7 @@ def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bo
                                     is_friend=False
                                 ))
 
-                    elif event_type in ["add_state", "remove_state", "immune", "anti_skill_effect"] and use_effect_info:  # use_effect_info가 true일 때만 실행
+                    elif use_effect_info and event_type in ["add_state", "remove_state", "immune", "anti_skill_effect"]:  # use_effect_info가 true일 때만 실행
                         eff_report = process_eff_info(event)
                         if eff_report:
                             report.append(eff_report)
@@ -97,7 +103,7 @@ def generate_minimal_report(data):
     
     for turn_data in data:
         current_turn = turn_data.get("turn_index", current_turn)
-        report.extend(process_battle_events(turn_data, characters, use_effect_info=True))
+        report.extend(process_battle_events(turn_data, characters))
     
     # 전투 요약 정보
     report.extend([
@@ -108,11 +114,6 @@ def generate_minimal_report(data):
     
     for code, info in characters.items():
         report.append(f"  ◦ {code} (ID: {info['id']})\n")
-    
-    # 상태 요약 추가
-    state_summary = get_current_states_summary()
-    if state_summary:
-        report.append(state_summary)
     
     return "".join(report)
 
@@ -134,10 +135,5 @@ def generate_regular_report(data):
     
     for code, info in characters.items():
         report.append(f"  ◦ {code} (ID: {info['id']})\n")
-    
-    # 상태 요약 추가
-    state_summary = get_current_states_summary()
-    if state_summary:
-        report.append(state_summary)
 
     return "".join(report)
