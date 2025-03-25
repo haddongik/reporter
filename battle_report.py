@@ -8,6 +8,7 @@ from app.utils.report_utils import (
     process_eff_info,
     get_current_states_summary
 )
+from typing import Union, Any
 
 def generate_battle_report(data, report_type=None):
     if report_type == "minimal":
@@ -20,6 +21,18 @@ def generate_battle_report(data, report_type=None):
 
 def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bool = False) -> list[str]:
     report = []
+    
+    def convert_and_sort_data(data: Union[dict, list, Any]) -> list:
+        # 딕셔너리인 경우 리스트로 변환 (id 포함)
+        if isinstance(data, dict):
+            data = [{"id": code, **value} for code, value in data.items()]
+        # 리스트가 아닌 경우 리스트로 감싸기
+        elif not isinstance(data, list):
+            data = [data]
+        
+        # code를 기준으로 정렬
+        data.sort(key=lambda x: x.get("code", ""))
+        return data
     
     if "turn_index" in turn_data:
         report.append(f"\n## 턴 {turn_data['turn_index']}\n")
@@ -48,17 +61,7 @@ def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bo
                         
                         # 아군 처리
                         if "frineds" in event:  # 오타 유지
-                            friends_data = event["frineds"]
-                            # 딕셔너리인 경우 리스트로 변환
-                            if isinstance(friends_data, dict):
-                                friends_data = list(friends_data.values())
-                            # 리스트가 아닌 경우 리스트로 감싸기
-                            elif not isinstance(friends_data, list):
-                                friends_data = [friends_data]
-                            
-                            # code를 기준으로 정렬
-                            friends_data.sort(key=lambda x: x.get("code", ""))
-                            
+                            friends_data = convert_and_sort_data(event["frineds"])
                             for char_info in friends_data:
                                 report.extend(process_character_status(
                                     char_info.get("code", ""),
@@ -69,17 +72,7 @@ def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bo
                         
                         # 적군 처리
                         if "enemies" in event:
-                            enemies_data = event["enemies"]
-                            # 딕셔너리인 경우 리스트로 변환
-                            if isinstance(enemies_data, dict):
-                                enemies_data = list(enemies_data.values())
-                            # 리스트가 아닌 경우 리스트로 감싸기
-                            elif not isinstance(enemies_data, list):
-                                enemies_data = [enemies_data]
-                            
-                            # code를 기준으로 정렬
-                            enemies_data.sort(key=lambda x: x.get("code", ""))
-                            
+                            enemies_data = convert_and_sort_data(event["enemies"])
                             for enemy_info in enemies_data:
                                 report.extend(process_character_status(
                                     enemy_info.get("code", ""),

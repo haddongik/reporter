@@ -72,27 +72,27 @@ def process_character_status(code: str, char_info: dict, characters: dict, is_fr
     # 초기 상태 기록
     if code not in characters:
         characters[code] = {"id": char_id, "last_hp": hp, "last_status": status}
-        messages.append(f"{team} {code}의 최초 HP : {abs(hp)}\n")
-        messages.append(f"{team} {code}의 최초 STATUS : {format_status(status)}\n")
+        messages.append(f"{team} {char_id}({code})의 최초 HP : {abs(hp)}\n")
+        messages.append(f"{team} {char_id}({code})의 최초 STATUS : {format_status(status)}\n")
     
     # HP 변화 추적
     if characters[code]["last_hp"] != 0 and characters[code]["last_hp"] != hp:
         hp_change = hp - characters[code]["last_hp"]
         if hp_change < 0:
-            messages.append(f"- {code}의 HP가 {abs(hp_change)} 감소 (현재 HP: {hp})\n")
+            messages.append(f"- {char_id}({code})의 HP가 {abs(hp_change)} 감소 (현재 HP: {hp})\n")
         else:
-            messages.append(f"- {code}의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
+            messages.append(f"- {char_id}({code})의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
     
     # STATUS 변화 추적
     if "last_status" in characters[code]:
         if status != characters[code]["last_status"]:
             status_changes = compare_status_values(characters[code]["last_status"], status)
             if status_changes:
-                messages.append(f"- {code}의 상태 변화 발생:\n[\n")
+                messages.append(f"- {char_id}({code})의 상태 변화 발생:\n[\n")
                 messages.extend(f"{change}\n" for change in status_changes)
                 messages.append("]\n")
             else:
-                messages.append(f"- {code}의 STATUS가 {format_status(status)}로 변경됨\n")
+                messages.append(f"- {char_id}({code})의 STATUS가 {format_status(status)}로 변경됨\n")
     
     # 현재 상태 저장
     characters[code]["last_hp"] = hp
@@ -103,10 +103,11 @@ def process_character_status(code: str, char_info: dict, characters: dict, is_fr
 def convert_and_sort_data(data: Union[dict, list, Any]) -> list:
     """
     데이터를 리스트로 변환하고 code 기준으로 정렬합니다.
+    딕셔너리인 경우 키값도 리스트에 포함됩니다.
     """
-    # 딕셔너리인 경우 리스트로 변환
+    # 딕셔너리인 경우 리스트로 변환 (키값 포함)
     if isinstance(data, dict):
-        data = list(data.values())
+        data = [{"id": id, **value} for id, value in data.items()]
     # 리스트가 아닌 경우 리스트로 감싸기
     elif not isinstance(data, list):
         data = [data]
