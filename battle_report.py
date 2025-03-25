@@ -79,7 +79,7 @@ def process_battle_events(turn_data: dict, characters: dict) -> list[str]:
     return report
 
 def generate_minimal_report(data):
-    report = ["◆ 전투 분석 리포트\n"]
+    report = ["◆ 전투 분석 리포트(minimal)\n"]
     characters = {}
     current_turn = 0
     
@@ -100,5 +100,22 @@ def generate_minimal_report(data):
     return "".join(report)
 
 def generate_regular_report(data):
-    # minimal과 동일한 로직 사용
-    return generate_minimal_report(data) 
+    report = ["◆ 전투 분석 리포트(regular)\n"]
+    characters = {}
+    current_turn = 0
+    
+    for turn_data in data:
+        current_turn = turn_data.get("turn_index", current_turn)
+        report.extend(process_battle_events(turn_data, characters))
+    
+    # 전투 요약 정보
+    report.extend([
+        "\n◆ 전투 요약\n",
+        f"• 총 턴 수: {current_turn}\n",
+        "• 참가 캐릭터:\n"
+    ])
+    
+    for code, info in characters.items():
+        report.append(f"  ◦ {code} (ID: {info['id']})\n")
+    
+    return "".join(report)
