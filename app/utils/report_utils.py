@@ -1,13 +1,5 @@
 def format_status(status: dict | None) -> str:
-    """
-    캐릭터의 상태를 리스트 형식의 문자열로 변환합니다.
-    
-    Args:
-        status (dict | None): 상태 정보를 담은 딕셔너리 또는 None
-        
-    Returns:
-        str: 포맷팅된 상태 문자열
-    """
+
     if not status:
         return "[]"
     
@@ -16,16 +8,7 @@ def format_status(status: dict | None) -> str:
     return "[\n" + "\n".join(status_items) + "\n]"
 
 def compare_status_values(old_status: dict | None, new_status: dict | None) -> list[str]:
-    """
-    이전 상태와 새로운 상태의 수치를 비교하여 변경사항을 반환합니다.
-    
-    Args:
-        old_status: 이전 상태 딕셔너리
-        new_status: 새로운 상태 딕셔너리
-    
-    Returns:
-        list[str]: 변경사항 메시지 리스트
-    """
+
     if not old_status or not new_status:
         return []
     
@@ -45,9 +28,7 @@ def compare_status_values(old_status: dict | None, new_status: dict | None) -> l
     return changes
 
 def process_attack_event(event: dict) -> str:
-    """
-    공격 이벤트를 처리하여 문자열로 반환합니다.
-    """
+
     attacker = event.get("from_code", "알 수 없음")
     target = event.get("target_code", "알 수 없음")
     damage = event.get("dec_hp", 0)
@@ -65,9 +46,7 @@ def process_attack_event(event: dict) -> str:
     return attack_desc + "\n"
 
 def process_state_info(state: str) -> str:
-    """
-    상태 정보를 처리하여 문자열로 반환합니다.
-    """
+
     state_messages = {
         "sub_state_init": "sub_state_init",
         "pending_ready": "pending_ready",
@@ -81,9 +60,7 @@ def process_state_info(state: str) -> str:
     return f"• {state_messages.get(state, '알 수 없는 상태')}\n"
 
 def process_character_status(code: str, char_info: dict, characters: dict, is_friend: bool = True) -> list[str]:
-    """
-    캐릭터의 상태 정보를 처리하여 메시지 리스트를 반환합니다.
-    """
+
     messages = []
     char_id = char_info.get("id")
     hp = char_info.get("hp", 0)
