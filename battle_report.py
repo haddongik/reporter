@@ -1,7 +1,13 @@
 # battle_report.py
 # 전투 데이터 분석 및 리포트 생성 모듈
 
-from app.utils.report_utils import (process_attack_event,process_state_info, process_character_status)
+from app.utils.report_utils import (
+    process_attack_event, 
+    process_state_info, 
+    process_character_status,
+    process_eff_info,
+    get_current_states_summary
+)
 
 def generate_battle_report(data, report_type=None):
     if report_type == "minimal":
@@ -12,7 +18,7 @@ def generate_battle_report(data, report_type=None):
         print(f"지원하지 않는 리포트 타입: {report_type}")
         return
 
-def process_battle_events(turn_data: dict, characters: dict) -> list[str]:
+def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bool = False) -> list[str]:
     report = []
     
     if "turn_index" in turn_data:
@@ -75,6 +81,12 @@ def process_battle_events(turn_data: dict, characters: dict) -> list[str]:
                                     characters,
                                     is_friend=False
                                 ))
+
+                    elif event_type in ["add_state", "remove_state", "immune", "anti_skill_effect"] and use_effect_info:  # use_effect_info가 true일 때만 실행
+                        eff_report = process_eff_info(event)
+                        if eff_report:
+                            report.append(eff_report)
+                    
     
     return report
 
@@ -85,7 +97,7 @@ def generate_minimal_report(data):
     
     for turn_data in data:
         current_turn = turn_data.get("turn_index", current_turn)
-        report.extend(process_battle_events(turn_data, characters))
+        report.extend(process_battle_events(turn_data, characters, use_effect_info=True))
     
     # 전투 요약 정보
     report.extend([
@@ -96,6 +108,11 @@ def generate_minimal_report(data):
     
     for code, info in characters.items():
         report.append(f"  ◦ {code} (ID: {info['id']})\n")
+    
+    # 상태 요약 추가
+    state_summary = get_current_states_summary()
+    if state_summary:
+        report.append(state_summary)
     
     return "".join(report)
 
@@ -106,7 +123,7 @@ def generate_regular_report(data):
     
     for turn_data in data:
         current_turn = turn_data.get("turn_index", current_turn)
-        report.extend(process_battle_events(turn_data, characters))
+        report.extend(process_battle_events(turn_data, characters, use_effect_info=True))
     
     # 전투 요약 정보
     report.extend([
@@ -118,4 +135,9 @@ def generate_regular_report(data):
     for code, info in characters.items():
         report.append(f"  ◦ {code} (ID: {info['id']})\n")
     
+    # 상태 요약 추가
+    state_summary = get_current_states_summary()
+    if state_summary:
+        report.append(state_summary)
+
     return "".join(report)

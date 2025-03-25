@@ -1,3 +1,5 @@
+from typing import Union, Any
+
 def format_status(status: dict | None) -> str:
 
     if not status:
@@ -97,3 +99,116 @@ def process_character_status(code: str, char_info: dict, characters: dict, is_fr
     characters[code]["last_status"] = status
     
     return messages
+
+def convert_and_sort_data(data: Union[dict, list, Any]) -> list:
+    """
+    데이터를 리스트로 변환하고 code 기준으로 정렬합니다.
+    """
+    # 딕셔너리인 경우 리스트로 변환
+    if isinstance(data, dict):
+        data = list(data.values())
+    # 리스트가 아닌 경우 리스트로 감싸기
+    elif not isinstance(data, list):
+        data = [data]
+    
+    return data
+
+# 전역 상태 추적기
+class StateTracker:
+    def __init__(self):
+        self.states = {}  # uid -> set(states)
+    
+    def add_state(self, uid: Union[str, int], state: str):
+        uid_str = str(uid)
+        if uid_str not in self.states:
+            self.states[uid_str] = set()
+        self.states[uid_str].add(str(state))
+    
+    def remove_state(self, uid: Union[str, int], state: str):
+        uid_str = str(uid)
+        if uid_str in self.states:
+            self.states[uid_str].discard(str(state))
+            if not self.states[uid_str]:
+                del self.states[uid_str]
+    
+    def get_states(self, uid: Union[str, int]) -> set:
+        return self.states.get(str(uid), set())
+    
+    def get_all_states(self) -> dict:
+        try:
+            # uid를 정수로 변환하여 정렬
+            sorted_uids = sorted(self.states.keys(), key=lambda x: int(x))
+            result = {}
+            for uid in sorted_uids:
+                # 각 상태를 문자열로 처리하여 정렬
+                states = self.states[uid]
+                result[uid] = sorted(str(state) for state in states)
+            return result
+        except (ValueError, TypeError):
+            # 정수 변환 실패 시 문자열 기준 정렬
+            sorted_uids = sorted(self.states.keys())
+            return {uid: sorted(str(state) for state in self.states[uid]) 
+                   for uid in sorted_uids}
+
+# 전역 상태 추적기 인스턴스 생성
+state_tracker = StateTracker()
+
+def process_add_state_event(event: dict) -> str:
+
+    target_code = event.get("target_code", "알 수 없음")
+    state = event.get("state", "알 수 없음")
+    target_uid = str(event.get("target_uid", "알 수 없음"))
+    
+    # 전역 상태 업데이트
+    state_tracker.add_state(target_uid, state)
+    
+    return f"- {target_code}(UID:{target_uid})에게 상태 추가: {state}\n"
+
+def process_remove_state_event(event: dict) -> str:
+
+    target_code = event.get("target_code", "알 수 없음")
+    state = event.get("state", "알 수 없음")
+    target_uid = str(event.get("target_uid", "알 수 없음"))
+    
+    # 전역 상태 업데이트
+    state_tracker.remove_state(target_uid, state)
+    
+    return f"- {target_code}(UID:{target_uid})의 상태 제거: {state}\n"
+
+def get_current_states_summary() -> str:
+
+    summary = ["\n◆ 현재 상태 요약\n"]
+    
+    try:
+        all_states = state_tracker.get_all_states()
+        for uid in all_states:
+            states = all_states[uid]
+            if states:  # 상태가 있는 경우만 표시
+                summary.append(f"• UID:{uid}의 현재 상태: {', '.join(states)}\n")
+    except Exception as e:
+        summary.append(f"• 상태 정보 처리 중 오류 발생: {str(e)}\n")
+    
+    return "".join(summary) if len(summary) > 1 else ""
+
+def process_eff_info(event: dict) -> str:
+
+    event_type = event.get("type", "")
+    target_code = event.get("target_code", "알 수 없음")
+    state = event.get("state", "알 수 없음")
+    target_uid = str(event.get("target_uid", "알 수 없음"))
+    
+    if event_type == "add_state":
+        state_tracker.add_state(target_uid, state)
+        #return f"- {target_code}(UID:{target_uid})에게 상태 추가: {state}\n"
+    elif event_type == "remove_state":
+        state_tracker.remove_state(target_uid, state)
+        #return f"- {target_code}(UID:{target_uid})의 상태 제거: {state}\n"
+    elif event_type == "immune":
+        pass
+        #return f"- {target_code}(UID:{target_uid})가 {state} 상태에 면역\n"
+    elif event_type == "anti_skill_effect":
+        pass
+        #return f"- {target_code}(UID:{target_uid})가 {state} 효과에 저항\n"
+    else:
+        pass
+        #return f"- 알 수 없는 상태 효과: {event_type}\n"
