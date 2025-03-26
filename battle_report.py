@@ -5,45 +5,41 @@ from app.utils.report_utils import (
     process_attack_event, 
     process_state_info, 
     process_character_status,
+    convert_and_sort_data,
     process_eff_info,
     get_current_states_summary
 )
 from typing import Union, Any
 
 def generate_battle_report(data, report_type=None):
-    if report_type == "minimal":
-        return generate_minimal_report(data)
-    elif report_type == "regular":
-        return generate_regular_report(data)
-    else:
-        print(f"지원하지 않는 리포트 타입: {report_type}")
-        return
+    report = ["◆ Battle Analysis Report ({report_type})\n"]
+    characters = {}
+    current_turn = 0
+    
+    for turn_data in data:
+        current_turn = turn_data.get("turn_index", current_turn)
+        report.extend(process_battle_events(turn_data, characters, report_type))
+    
+    if report_type == "full":
+        report.extend(["\n◆ Battle Summary\n",f"• Total Turns: {current_turn}\n","• Participating Characters:\n"])
+        for code, info in characters.items():
+            report.append(f"  ◦ {code} (ID: {info['id']})\n")
+    
+    return "".join(report)
 
-def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bool = False) -> list[str]:
+def process_battle_events(turn_data: dict, characters: dict, report_type: str) -> list[str]:
     report = []
     
-    def convert_and_sort_data(data: Union[dict, list, Any]) -> list:
-        # 딕셔너리인 경우 리스트로 변환 (id 포함)
-        if isinstance(data, dict):
-            data = [{"id": code, **value} for code, value in data.items()]
-        # 리스트가 아닌 경우 리스트로 감싸기
-        elif not isinstance(data, list):
-            data = [data]
-        
-        # code를 기준으로 정렬
-        data.sort(key=lambda x: x.get("code", ""))
-        return data
-    
     if "turn_index" in turn_data:
-        report.append(f"\n## 턴 {turn_data['turn_index']}\n")
+        report.append(f"\n## Turn {turn_data['turn_index']}\n")
     
     if "history" in turn_data:
         for sub_history in turn_data["history"]:
             if "sub_owner_code" in sub_history:
-                report.append(f"# {sub_history['sub_owner_code']}의 행동\n")
+                report.append(f"# {sub_history['sub_owner_code']} Action ({sub_history['sub_type']})\n")
 
-                # 상태 요약 추가
-                if use_effect_info:
+                # Add status summary
+                if report_type == "full" or report_type == "effect":
                     state_summary = get_current_states_summary()
                     if state_summary:
                         report.append(state_summary)
@@ -53,24 +49,25 @@ def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bo
                     event_type = event.get("type", "")
                     
                     if event_type == "attack":
-                        report.append(process_attack_event(event))
+                        report.append(process_attack_event(event, report_type))
                     
                     elif event_type == "sub_state_info":
                         state = event.get("state", "")
-                        report.append(process_state_info(state))
+                        report.append(process_state_info(state, report_type))
                         
-                        # 아군 처리
-                        if "frineds" in event:  # 오타 유지
+                        # Process allies
+                        if "frineds" in event:  # Keep typo
                             friends_data = convert_and_sort_data(event["frineds"])
                             for char_info in friends_data:
                                 report.extend(process_character_status(
                                     char_info.get("code", ""),
                                     char_info,
                                     characters,
-                                    is_friend=True
+                                    is_friend=True,
+                                    report_type=report_type
                                 ))
                         
-                        # 적군 처리
+                        # Process enemies
                         if "enemies" in event:
                             enemies_data = convert_and_sort_data(event["enemies"])
                             for enemy_info in enemies_data:
@@ -78,55 +75,13 @@ def process_battle_events(turn_data: dict, characters: dict, use_effect_info: bo
                                     enemy_info.get("code", ""),
                                     enemy_info,
                                     characters,
-                                    is_friend=False
+                                    is_friend=False,
+                                    report_type=report_type
                                 ))
 
-                    elif use_effect_info and event_type in ["add_state", "remove_state", "immune", "anti_skill_effect"]:  # use_effect_info가 true일 때만 실행
-                        eff_report = process_eff_info(event)
+                    elif event_type in ["add_state", "remove_state", "immune", "anti_skill_effect"]:
+                        eff_report = process_eff_info(event, report_type)
                         if eff_report:
                             report.append(eff_report)
-                    
     
     return report
-
-def generate_minimal_report(data):
-    report = ["◆ 전투 분석 리포트(minimal)\n"]
-    characters = {}
-    current_turn = 0
-    
-    for turn_data in data:
-        current_turn = turn_data.get("turn_index", current_turn)
-        report.extend(process_battle_events(turn_data, characters))
-    
-    # 전투 요약 정보
-    report.extend([
-        "\n◆ 전투 요약\n",
-        f"• 총 턴 수: {current_turn}\n",
-        "• 참가 캐릭터:\n"
-    ])
-    
-    for code, info in characters.items():
-        report.append(f"  ◦ {code} (ID: {info['id']})\n")
-    
-    return "".join(report)
-
-def generate_regular_report(data):
-    report = ["◆ 전투 분석 리포트(regular)\n"]
-    characters = {}
-    current_turn = 0
-    
-    for turn_data in data:
-        current_turn = turn_data.get("turn_index", current_turn)
-        report.extend(process_battle_events(turn_data, characters, use_effect_info=True))
-    
-    # 전투 요약 정보
-    report.extend([
-        "\n◆ 전투 요약\n",
-        f"• 총 턴 수: {current_turn}\n",
-        "• 참가 캐릭터:\n"
-    ])
-    
-    for code, info in characters.items():
-        report.append(f"  ◦ {code} (ID: {info['id']})\n")
-
-    return "".join(report)

@@ -12,7 +12,7 @@ async def chat(request: ChatRequest):
 
 @router.post("/analysis")
 async def analysis(request: AnalysisRequest):
-    analysis = await langchain_service.process_analyze(
+    analysis = await langchain_service.process_analyze_full(
         original_text=request.original_text,
         comparison_text=request.comparison_text
     )

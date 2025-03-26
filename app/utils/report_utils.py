@@ -1,119 +1,5 @@
 from typing import Union, Any
 
-def format_status(status: dict | None) -> str:
-
-    if not status:
-        return "[]"
-    
-    # 딕셔너리의 각 항목을 'key:value' 형식으로 변환
-    status_items = [f"   {key}:{value}" for key, value in status.items()]
-    return "[\n" + "\n".join(status_items) + "\n]"
-
-def compare_status_values(old_status: dict | None, new_status: dict | None) -> list[str]:
-
-    if not old_status or not new_status:
-        return []
-    
-    changes = []
-    for key in set(old_status.keys()) | set(new_status.keys()):
-        old_value = old_status.get(key)
-        new_value = new_status.get(key)
-        
-        if old_value != new_value:
-            if isinstance(old_value, (int, float)) and isinstance(new_value, (int, float)):
-                change = new_value - old_value
-                direction = "증가" if change > 0 else "감소"
-                changes.append(f"   {key}:{old_value} -> {key}:{new_value} ({abs(change)} {direction})")
-            else:
-                changes.append(f"   {key}:{old_value} -> {key}:{new_value}")
-    
-    return changes
-
-def process_attack_event(event: dict) -> str:
-
-    attacker = event.get("from_code", "알 수 없음")
-    target = event.get("target_code", "알 수 없음")
-    damage = event.get("dec_hp", 0)
-    critical = "치명타" if event.get("critical", False) else ""
-    miss = "빗나감" if event.get("miss", False) else ""
-    
-    attack_desc = f"- {attacker}이(가) {target}에게 공격: {damage} 데미지"
-    if critical:
-        attack_desc += f" ({critical})"
-    if miss:
-        attack_desc += f" ({miss})"
-    if "eff" in event:
-        attack_desc += f" [효과: {event['eff']}]"
-    
-    return attack_desc + "\n"
-
-def process_state_info(state: str) -> str:
-
-    state_messages = {
-        "sub_state_init": "sub_state_init",
-        "pending_ready": "pending_ready",
-        "ready": "ready",
-        "pending_start": "pending_start",
-        "pending_end": "pending_end",
-        "ended": "ended",
-        "next": "next",
-        "attack": "attack",
-    }
-    return f"• {state_messages.get(state, '알 수 없는 상태')}\n"
-
-def process_character_status(code: str, char_info: dict, characters: dict, is_friend: bool = True) -> list[str]:
-
-    messages = []
-    char_id = char_info.get("id")
-    hp = char_info.get("hp", 0)
-    status = char_info.get("status")
-    team = "아군" if is_friend else "적군"
-    
-    # 초기 상태 기록
-    if code not in characters:
-        characters[code] = {"id": char_id, "last_hp": hp, "last_status": status}
-        messages.append(f"{team} {char_id}({code})의 최초 HP : {abs(hp)}\n")
-        messages.append(f"{team} {char_id}({code})의 최초 STATUS : {format_status(status)}\n")
-    
-    # HP 변화 추적
-    if characters[code]["last_hp"] != 0 and characters[code]["last_hp"] != hp:
-        hp_change = hp - characters[code]["last_hp"]
-        if hp_change < 0:
-            messages.append(f"- {char_id}({code})의 HP가 {abs(hp_change)} 감소 (현재 HP: {hp})\n")
-        else:
-            messages.append(f"- {char_id}({code})의 HP가 {hp_change} 증가 (현재 HP: {hp})\n")
-    
-    # STATUS 변화 추적
-    if "last_status" in characters[code]:
-        if status != characters[code]["last_status"]:
-            status_changes = compare_status_values(characters[code]["last_status"], status)
-            if status_changes:
-                messages.append(f"- {char_id}({code})의 상태 변화 발생:\n[\n")
-                messages.extend(f"{change}\n" for change in status_changes)
-                messages.append("]\n")
-            else:
-                messages.append(f"- {char_id}({code})의 STATUS가 {format_status(status)}로 변경됨\n")
-    
-    # 현재 상태 저장
-    characters[code]["last_hp"] = hp
-    characters[code]["last_status"] = status
-    
-    return messages
-
-def convert_and_sort_data(data: Union[dict, list, Any]) -> list:
-    """
-    데이터를 리스트로 변환하고 code 기준으로 정렬합니다.
-    딕셔너리인 경우 키값도 리스트에 포함됩니다.
-    """
-    # 딕셔너리인 경우 리스트로 변환 (키값 포함)
-    if isinstance(data, dict):
-        data = [{"id": id, **value} for id, value in data.items()]
-    # 리스트가 아닌 경우 리스트로 감싸기
-    elif not isinstance(data, list):
-        data = [data]
-    
-    return data
-
 # 전역 상태 추적기
 class StateTracker:
     def __init__(self):
@@ -154,62 +40,140 @@ class StateTracker:
 # 전역 상태 추적기 인스턴스 생성
 state_tracker = StateTracker()
 
-def process_add_state_event(event: dict) -> str:
-
-    target_code = event.get("target_code", "알 수 없음")
-    state = event.get("state", "알 수 없음")
-    target_uid = str(event.get("target_uid", "알 수 없음"))
-    
-    # 전역 상태 업데이트
-    state_tracker.add_state(target_uid, state)
-    
-    return f"- {target_code}(UID:{target_uid})에게 상태 추가: {state}\n"
-
-def process_remove_state_event(event: dict) -> str:
-
-    target_code = event.get("target_code", "알 수 없음")
-    state = event.get("state", "알 수 없음")
-    target_uid = str(event.get("target_uid", "알 수 없음"))
-    
-    # 전역 상태 업데이트
-    state_tracker.remove_state(target_uid, state)
-    
-    return f"- {target_code}(UID:{target_uid})의 상태 제거: {state}\n"
-
 def get_current_states_summary() -> str:
-
-    summary = ["\n### 현재 상태 요약\n"]
+    summary = ["\n### Current States Summary\n"]
     
     try:
         all_states = state_tracker.get_all_states()
         for uid in all_states:
             states = all_states[uid]
-            if states:  # 상태가 있는 경우만 표시
-                summary.append(f" * UID:{uid}의 현재 상태: {', '.join(states)}\n")
+            if states:  # Only display if states exist
+                summary.append(f" * UID:{uid} Current States: {', '.join(states)}\n")
     except Exception as e:
-        summary.append(f"* 상태 정보 처리 중 오류 발생: {str(e)}\n")
+        summary.append(f"* Error processing state information: {str(e)}\n")
     
     return "".join(summary) if len(summary) > 1 else ""
 
-def process_eff_info(event: dict) -> str:
+def format_status(status: dict | None) -> str:
+    if not status:
+        return "[]"
+    
+    # 딕셔너리의 각 항목을 'key:value' 형식으로 변환
+    status_items = [f"   {key}:{value}" for key, value in status.items()]
+    return "[\n" + "\n".join(status_items) + "\n]"
 
+def convert_and_sort_data(data: Union[dict, list, Any]) -> list:
+    # 딕셔너리인 경우 리스트로 변환 (키값 포함)
+    if isinstance(data, dict):
+        data = [{"id": id, **value} for id, value in data.items()]
+    # 리스트가 아닌 경우 리스트로 감싸기
+    elif not isinstance(data, list):
+        data = [data]
+    
+    # id를 기준으로 정렬
+    data.sort(key=lambda x: x.get("id", ""))
+    
+    return data
+
+def compare_status_values(old_status: dict | None, new_status: dict | None) -> list[str]:
+    if not old_status or not new_status:
+        return []
+    
+    changes = []
+    for key in set(old_status.keys()) | set(new_status.keys()):
+        old_value = old_status.get(key)
+        new_value = new_status.get(key)
+        
+        if old_value != new_value:
+            if isinstance(old_value, (int, float)) and isinstance(new_value, (int, float)):
+                change = new_value - old_value
+                direction = "increase" if change > 0 else "decrease"
+                changes.append(f"{key}: {old_value} → {new_value} ({abs(change)} {direction})")
+            else:
+                changes.append(f"{key}: {old_value} → {new_value}")
+    
+    return changes
+
+def process_attack_event(event: dict, report_type: str = "full") -> str:
+    if report_type not in ["attack", "full"]:
+        return ""  # 빈 문자열 반환
+    
+    from_uid = event.get("from_uid", "Unknown")
+    from_code = event.get("from_code", "Unknown")
+    target_uid = event.get("target_uid", "Unknown")
+    target_code = event.get("target_code", "Unknown")
+    dec_hp = event.get("dec_hp", 0)
+    has_eff = event.get("eff", "Attack")
+    is_critical = event.get("critical", False)
+    is_miss = event.get("miss", False)
+    
+    attack_desc = f"- {from_code}(UID:{from_uid}) deals {dec_hp} damage to {target_code}(UID:{target_uid})"
+    if has_eff:
+        attack_desc += f" [Effect: {has_eff}]"
+    if is_critical:
+        attack_desc += f" (Critical)"
+    if is_miss:
+        attack_desc += f" (Miss)"
+
+    return attack_desc + "\n"
+
+def process_state_info(state: str, report_type: str = "full") -> str:
+    if report_type not in ["status", "full"]:
+        return ""  # 빈 문자열 반환
+    
+    return f"- event: {state}\n"
+
+def process_character_status(
+    code: str, 
+    char_info: dict, 
+    characters: dict, 
+    is_friend: bool = True,
+    report_type: str = "full"
+) -> list[str]:
+    report = []
+    
+    # 캐릭터 정보 저장
+    if code not in characters:
+        characters[code] = { "id": char_info.get("id", ""), "code": code, "status": {} }
+    
+    # 상태 정보 처리
+    if report_type in ["status", "full"]:
+        if "status" in char_info:
+            old_status = characters[code]["status"].copy()
+            characters[code]["status"] = char_info["status"]
+
+            if not old_status and char_info["status"]:
+                report.append(f"- {code}(UID:{char_info['id']}) STATUS Initialization:\n{format_status(char_info['status'])}\n")
+            elif old_status != char_info["status"]:
+                status_changes = compare_status_values(old_status, char_info["status"])
+                if status_changes:
+                    report.append(f"- {code}(UID:{char_info['id']}) STATUS Changes: {status_changes}\n")
+    
+    # HP 정보 처리
+    if report_type in ["hp", "full"]:
+        if "hp" in char_info:
+            report.append(f"- {code}(UID:{char_info['id']}) HP: {char_info['hp']}\n")
+    
+    return report
+
+def process_eff_info(event: dict, report_type: str = "effect") -> str:
+    if report_type not in ["effect", "full"]:
+        return ""  # 빈 문자열 반환
+        
     event_type = event.get("type", "")
-    target_code = event.get("target_code", "알 수 없음")
-    state = event.get("state", "알 수 없음")
-    target_uid = str(event.get("target_uid", "알 수 없음"))
+    target_code = event.get("target_code", "Unknown")
+    state = event.get("state", "Unknown")
+    target_uid = str(event.get("target_uid", "Unknown"))
     
     if event_type == "add_state":
         state_tracker.add_state(target_uid, state)
-        #return f"- {target_code}(UID:{target_uid})에게 상태 추가: {state}\n"
+        return f"- Add State to {target_code}(UID:{target_uid}): {state}\n"
     elif event_type == "remove_state":
         state_tracker.remove_state(target_uid, state)
-        #return f"- {target_code}(UID:{target_uid})의 상태 제거: {state}\n"
+        return f"- Remove State from {target_code}(UID:{target_uid}): {state}\n"
     elif event_type == "immune":
-        pass
-        #return f"- {target_code}(UID:{target_uid})가 {state} 상태에 면역\n"
+        return f"- {target_code}(UID:{target_uid}) is immune to {state}\n"
     elif event_type == "anti_skill_effect":
-        pass
-        #return f"- {target_code}(UID:{target_uid})가 {state} 효과에 저항\n"
+        return f"- {target_code}(UID:{target_uid}) resists {state} effect\n"
     else:
-        pass
-        #return f"- 알 수 없는 상태 효과: {event_type}\n"
+        return f"- Unknown state effect: {event_type}\n"

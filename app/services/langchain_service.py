@@ -1,124 +1,136 @@
 import re
+import asyncio
+import os
+from typing import Literal, List, Optional, Dict, Any
 from langchain_community.llms.ollama import Ollama
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+from langchain.chains import LLMChain, SequentialChain
+from langchain.prompts import ChatPromptTemplate
+from langchain.output_parsers import PydanticOutputParser
+from app.prompts.battle_prompts import BATTLE_PROMPTS
+from battle_report import generate_battle_report
 
 class LangChainService:
-    def __init__(self):
-        self.llm = Ollama(
-            model="deepseek-r1:14b",
-            base_url="http://localhost:11434"
-        )
-        
-    async def process_analyze(self, original_text: str, comparison_text: str):
-        analyze_prompt = PromptTemplate(
-            input_variables=["original", "comparison"],
-            template="""
-            유저 데이터와 서버 데이터를 분석하여 차이점과 유사점을 찾아주세요.
-            서버 데이터는 완전하게 오차없는 데이터이고,
-            유저 데이터는 오차(해킹포함)가 발생할 수 있는 데이터입니다.
-
-            유저 데이터:
-            {original}
-
-            서버 데이터:
-            {comparison}
-
-            분석 포인트:
-            1. 주요 차이점
-            2. 유사한 부분
-            3. 오차가 발생했을 경우, 유저 데이터가 큰 이득을 얻었는지 혹은 큰 손해를 입었는지
-            4. 전체적인 평가(오탐으로 볼것인지 해킹으로 볼것인지)
-            5. 유저 데이터가 해킹으로 볼 경우, 해킹 방법을 찾아주세요.
-            6. 유저 데이터가 오탐으로 볼 경우, 오탐 방법을 찾아주세요.
-            상세 분석 결과:
-            """
-        )
-        
-        chain = LLMChain(llm=self.llm, prompt=analyze_prompt)
-        response = await chain.arun(
-            original=original_text,
-            comparison=comparison_text
-        )
-
-        return response
     
-    async def process_analyze_by_turn(self, original_text: str, comparison_text: str):
+    def __init__( self, model_type: Literal["local", "openai"] = "local", openai_api_key: str = None ):
 
-        turn_compare_prompt = PromptTemplate(
-            input_variables=["turn_index", "user_turn_content", "server_turn_content"],
-            template="""
-            턴 {turn_index}의 유저 데이터와 서버 데이터를 비교하여 분석해주세요.
-
-            [유저 턴 로그]
-            {user_turn_content}
-
-            [서버 턴 로그]
-            {server_turn_content}
-
-            분석 포인트:
-            - 행동/데미지/효과 등에서 차이점
-            - 유사한 점
-            - 유저가 이득을 본 부분
-            - 의심되는 조작 여부
-            간단 요약 (한글로):
-            """
-        )
-
-        final_summary_prompt = PromptTemplate(
-            input_variables=["turn_summaries"],
-            template="""
-            아래는 턴별 로그 비교 분석 결과입니다:
-
-            {turn_summaries}
-
-            이 내용을 바탕으로 전체적인 판단을 내려주세요.
-
-            분석 포인트:
-            1. 전체적인 차이 경향
-            2. 유저 데이터에 해킹 또는 오탐 의심 정황
-            3. 유저가 얻은 이득/손해
-            4. 해킹으로 판단되는 경우, 어떤 방식으로 조작되었는지
-            5. 오탐일 경우, 어떤 패턴 때문에 오탐으로 보였는지
-
-            전체 판단 요약:
-            """
-        )
-
-        turn_compare_chain = LLMChain(llm=self.llm, prompt=self.turn_compare_prompt)
-        final_summary_chain = LLMChain(llm=self.llm, prompt=self.final_summary_prompt)
-
-        user_turns = self.split_turns(original_text)
-        server_turns = self.split_turns(comparison_text)
-
-        turn_summaries = []
-        for idx, ((_, user_turn_content), (_, server_turn_content)) in enumerate(zip(user_turns, server_turns)):
-            turn_result = await self.turn_compare_chain.arun(
-                turn_index=idx,
-                user_turn_content=user_turn_content,
-                server_turn_content=server_turn_content
+        # gemini 2.5, claude 3.7 sonnet max, gpt 4-turbo
+        self.model_type = model_type
+        if model_type == "local":
+            self.llm = Ollama(
+                model="deepseek-r1:14b",
+                base_url="http://localhost:11434"
             )
-            turn_summaries.append(f"[턴 {idx}] 요약:\n{turn_result}\n")
-
-        # 전체 요약 요청
-        final_result = await self.final_summary_chain.arun(
-            turn_summaries="\n".join(turn_summaries)
-        )
-
-        return {
-            "turn_analyses": turn_summaries,
-            "final_summary": final_result
-        }
-    
-    async def process_chat(self, query: str):
-        prompt = PromptTemplate(
-            input_variables=["query"],
-            template="질문: {query}\n답변:"
-        )
+        elif model_type == "openai":
+            if not openai_api_key:
+                raise ValueError("OpenAI API 키가 필요합니다.")
+            self.llm = ChatOpenAI(
+                model="gpt-4-turbo-preview",
+                temperature=0.7,
+                openai_api_key=openai_api_key
+            )
+        else:
+            raise ValueError(f"지원하지 않는 모델 타입입니다: {model_type}")
         
+        self.parser = PydanticOutputParser()
+
+    async def run(self, user_data: Dict[str, Any], verify_data: Dict[str, Any], report_types: List[str]) -> Dict[str, Any]:
+
+        results = {}
+        
+        # 각 리포트 타입에 대해 리포트 생성
+        for report_type in report_types:
+            user_report = self.create_battle_report(user_data, report_type, f"user_{report_type}_report.txt")
+            verify_report = self.create_battle_report(verify_data, report_type, f"verify_{report_type}_report.txt")
+            
+            if report_type in ["status", "hp", "attack"]:
+                analysis_result = await self.process_analyze_by_turn(user_report, verify_report, report_type.upper())
+                results[report_type] = analysis_result
+            elif report_type == "full":
+                analysis_result = await self.process_analyze_full(user_report, verify_report)
+                results[report_type] = analysis_result
+        
+        return results
+
+    def create_battle_report(self, data: Dict[str, Any], report_type: Optional[str] = None, output_filename: Optional[str] = None) -> Optional[str]:
+
+        # 전투 리포트 생성
+        battle_report = generate_battle_report(data, report_type)
+        if not battle_report:
+            print("리포트 생성에 실패했습니다.")
+            return None
+
+        # 파일 저장
+        if output_filename:
+            try:
+                # reports 폴더 없으면 생성
+                current_folder = os.getcwd()
+                reports_folder = os.path.join(current_folder, "reports")
+                if not os.path.exists(reports_folder):
+                    os.makedirs(reports_folder)
+
+                report_file_path = os.path.join(reports_folder, output_filename)
+                with open(report_file_path, "w", encoding="utf-8") as report_file:
+                    report_file.write(battle_report)
+                print(f"\n전투 리포트(타입: {report_type}, 파일명: {output_filename})가 {report_file_path}에 저장되었습니다.")
+            except Exception as e:
+                print(f"리포트 저장 중 오류 발생: {e}")
+        
+        return battle_report
+
+    async def process_analyze_by_turn(self, user_report: str, verify_report: str, prompt_type: str) -> str:
+
+        # 프롬프트 템플릿 생성
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", BATTLE_PROMPTS[prompt_type]["turn_compare"]),
+            ("user", "{user_report}\n\n{verify_report}")
+        ])
+
+        # 체인 생성
         chain = LLMChain(llm=self.llm, prompt=prompt)
-        response = await chain.arun(query=query)
-        return response
+
+        # 체인 실행
+        result = await chain.arun(
+            user_report=user_report,
+            verify_report=verify_report
+        )
+
+        return result
+
+    async def process_analyze_full(self, user_report: str, verify_report: str) -> str:
+
+        # 프롬프트 템플릿 생성
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", BATTLE_PROMPTS["FULL"]["turn_compare"]),
+            ("user", "{user_report}\n\n{verify_report}")
+        ])
+
+        # 체인 생성
+        chain = LLMChain(llm=self.llm, prompt=prompt)
+
+        # 체인 실행
+        result = await chain.arun(
+            user_report=user_report,
+            verify_report=verify_report
+        )
+
+        return result
+
+    async def process_chat(self, query: str) -> str:
+
+        # 프롬프트 템플릿 생성
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a helpful assistant that provides accurate and concise answers."),
+            ("user", "{query}")
+        ])
+
+        # 체인 생성
+        chain = LLMChain(llm=self.llm, prompt=prompt)
+
+        # 체인 실행
+        result = await chain.arun(query=query)
+
+        return result
     
     def split_turns(self, log_text: str):
         """## 턴 N 기준으로 로그를 턴별로 나눔"""
