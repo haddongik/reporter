@@ -10,9 +10,11 @@ from langchain_anthropic import ChatAnthropic
 from app.prompts.battle_prompts import BATTLE_PROMPTS
 from battle_report import generate_battle_report
 from app.utils.app_utils import split_turns
+from app.config.app_config import app_config  # 설정 파일 import
+
 class LangChainService:
     
-    def __init__( self, model_type: Literal["local", "openai", "gemini", "claude"] = "local", openai_api_key: str = None, google_api_key: str = None, anthropic_api_key: str = None ):
+    def __init__( self, model_type: Literal["local", "openai", "gemini", "claude"] = "local" ):
 
         # gemini 2.5, claude 3.7 sonnet max, gpt 4-turbo
         self.model_type = model_type
@@ -22,24 +24,22 @@ class LangChainService:
                 base_url="http://localhost:11434"
             )
         elif model_type == "openai":
-            if not openai_api_key:
-                raise ValueError("OpenAI API 키가 필요합니다.")
             self.llm = ChatOpenAI(
-                model="gpt-4-turbo-preview",
-                temperature=0.7,
-                openai_api_key=openai_api_key
+                model=app_config["openai"]["model"],
+                temperature=app_config["openai"]["temperature"],
+                openai_api_key=app_config["openai"]["api_key"]
             )
         elif model_type == "gemini":
             self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                temperature=0.7,
-                google_api_key=google_api_key
+                model=app_config["gemini"]["model"],
+                temperature=app_config["gemini"]["temperature"],
+                google_api_key=app_config["gemini"]["api_key"]
             )
         elif model_type == "claude":
             self.llm = ChatAnthropic(
-                model="claude-3-7-sonnet-max",
-                temperature=0.7,
-                anthropic_api_key=anthropic_api_key
+                model=app_config["claude"]["model"],
+                temperature=app_config["claude"]["temperature"],
+                anthropic_api_key=app_config["claude"]["api_key"]
             )
         else:
             raise ValueError(f"지원하지 않는 모델 타입입니다: {model_type}")

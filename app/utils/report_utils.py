@@ -107,7 +107,7 @@ def process_attack_event(event: dict, report_type: str = "full") -> str:
     is_critical = event.get("critical", False)
     is_miss = event.get("miss", False)
     
-    attack_desc = f"- {from_code}(UID:{from_uid}) deals {dec_hp} damage to {target_code}(UID:{target_uid})"
+    attack_desc = f"- ATTACK INFO: {from_code}(UID:{from_uid}) deals {dec_hp} damage to {target_code}(UID:{target_uid})"
     if has_eff:
         attack_desc += f" [Effect: {has_eff}]"
     if is_critical:
@@ -143,16 +143,16 @@ def process_character_status(
             characters[code]["status"] = char_info["status"]
 
             if not old_status and char_info["status"]:
-                report.append(f"- STATUS Initialization: {code}(UID:{char_info['id']})\n{format_status(char_info['status'])}\n")
+                report.append(f"- STATUS INIT: {code}(UID:{char_info['id']})\n{format_status(char_info['status'])}\n")
             elif old_status != char_info["status"]:
                 status_changes = compare_status_values(old_status, char_info["status"])
                 if status_changes:
-                    report.append(f"- STATUS Changes: {code}(UID:{char_info['id']}) {status_changes}\n")
+                    report.append(f"- STATUS CHANGE: {code}(UID:{char_info['id']}) {status_changes}\n")
     
     # HP 정보 처리
     if report_type in ["hp", "full"]:
         if "hp" in char_info:
-            report.append(f"- {code}(UID:{char_info['id']}) HP: {char_info['hp']}\n")
+            report.append(f"- HP INFO: {code}(UID:{char_info['id']}) [ {char_info['hp']} ]\n")
     
     return report
 
@@ -167,13 +167,13 @@ def process_eff_info(event: dict, report_type: str = "effect") -> str:
     
     if event_type == "add_state":
         state_tracker.add_state(target_uid, state)
-        return f"- Add State to {target_code}(UID:{target_uid}): {state}\n"
+        return f"- EFFECT ADD: {target_code}(UID:{target_uid}) [ {state} ]\n"
     elif event_type == "remove_state":
         state_tracker.remove_state(target_uid, state)
-        return f"- Remove State from {target_code}(UID:{target_uid}): {state}\n"
+        return f"- EFFECT REMOVE: {target_code}(UID:{target_uid}) [ {state} ]\n"
     elif event_type == "immune":
-        return f"- {target_code}(UID:{target_uid}) is immune to {state}\n"
+        return f"- EFFECT IMMUNE: {target_code}(UID:{target_uid}) immune [ {state} ]\n"
     elif event_type == "anti_skill_effect":
-        return f"- {target_code}(UID:{target_uid}) resists {state} effect\n"
+        return f"- EFFECT ANTISKILL: {target_code}(UID:{target_uid}) anti [ {state} ]\n"
     else:
         return f"- Unknown state effect: {event_type}\n"
