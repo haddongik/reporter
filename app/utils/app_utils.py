@@ -2,16 +2,21 @@ import os
 import json
 import base64
 import zlib
+import re
 from typing import Dict, Any, Optional
 
-def print_json_recursively(data: Any, indent: int = 0) -> None:
-    """
-    JSON 데이터를 재귀적으로 순회하며 출력합니다.
+def split_turns(log_text: str):
     
-    Args:
-        data: 출력할 데이터
-        indent: 들여쓰기 레벨
-    """
+    parts = re.split(r"(## Turn \d+)", log_text)
+    turns = []
+    for i in range(1, len(parts), 2):
+        turn_id = parts[i].strip()
+        content = parts[i+1].strip()
+        turns.append((turn_id, content))
+    return turns
+
+def print_json_recursively(data: Any, indent: int = 0) -> None:
+
     indent_str = "  " * indent
     
     if isinstance(data, dict):
@@ -32,15 +37,7 @@ def print_json_recursively(data: Any, indent: int = 0) -> None:
         print(f"{indent_str}{data}")
 
 def load_json(file_path: str) -> Optional[Dict[str, Any]]:
-    """
-    JSON 파일을 읽어서 로드합니다.
-    
-    Args:
-        file_path: JSON 파일 경로
-        
-    Returns:
-        Optional[Dict[str, Any]]: 로드된 JSON 데이터
-    """
+
     if not os.path.exists(file_path):
         print(f"파일이 존재하지 않습니다: {file_path}")
         return None
@@ -54,15 +51,7 @@ def load_json(file_path: str) -> Optional[Dict[str, Any]]:
         return None
 
 def decode64_and_decompress(encoded_data: str) -> Optional[str]:
-    """
-    Base64 디코딩 후 zlib 압축 해제를 수행합니다.
-    
-    Args:
-        encoded_data: Base64로 인코딩된 데이터
-        
-    Returns:
-        Optional[str]: 압축 해제된 데이터
-    """
+
     try:
         decoded_bytes = base64.b64decode(encoded_data)
         decompressed_data = zlib.decompress(decoded_bytes).decode("utf-8")
@@ -72,17 +61,7 @@ def decode64_and_decompress(encoded_data: str) -> Optional[str]:
         return None
 
 def process_json_data(json_data: Dict[str, Any], header: str, key: str) -> Optional[Dict[str, Any]]:
-    """
-    JSON 데이터에서 특정 헤더와 키를 사용하여 데이터를 추출합니다.
-    
-    Args:
-        json_data: 원본 JSON 데이터
-        header: 추출할 헤더
-        key: 추출할 키
-        
-    Returns:
-        Optional[Dict[str, Any]]: 처리된 데이터
-    """
+
     if not json_data or header not in json_data["_source"]:
         print(f"헤더 '{header}'를 찾을 수 없습니다.")
         return None
@@ -105,17 +84,7 @@ def process_json_data(json_data: Dict[str, Any], header: str, key: str) -> Optio
         return None
 
 def make_analysis_data(json_data: Dict[str, Any], header: str, key: str) -> Optional[Dict[str, Any]]:
-    """
-    JSON 데이터를 분석용 데이터로 변환합니다.
-    
-    Args:
-        json_data: 원본 JSON 데이터
-        header: 추출할 헤더
-        key: 추출할 키
-        
-    Returns:
-        Optional[Dict[str, Any]]: 분석용 데이터
-    """
+
     processed_data = process_json_data(json_data, header, key)
     if not processed_data:
         print("데이터 처리에 실패했습니다.")
