@@ -6,13 +6,14 @@ from langchain_community.llms.ollama import Ollama
 from langchain_openai import ChatOpenAI
 from langchain.chains import LLMChain, SequentialChain
 from langchain.prompts import ChatPromptTemplate
-from langchain.output_parsers import PydanticOutputParser
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 from app.prompts.battle_prompts import BATTLE_PROMPTS
 from battle_report import generate_battle_report
 
 class LangChainService:
     
-    def __init__( self, model_type: Literal["local", "openai"] = "local", openai_api_key: str = None ):
+    def __init__( self, model_type: Literal["local", "openai", "gemini", "claude"] = "local", openai_api_key: str = None, google_api_key: str = None, anthropic_api_key: str = None ):
 
         # gemini 2.5, claude 3.7 sonnet max, gpt 4-turbo
         self.model_type = model_type
@@ -29,10 +30,20 @@ class LangChainService:
                 temperature=0.7,
                 openai_api_key=openai_api_key
             )
+        elif model_type == "gemini":
+            self.llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash",
+                temperature=0.7,
+                google_api_key=google_api_key
+            )
+        elif model_type == "claude":
+            self.llm = ChatAnthropic(
+                model="claude-3-7-sonnet-max",
+                temperature=0.7,
+                anthropic_api_key=anthropic_api_key
+            )
         else:
             raise ValueError(f"지원하지 않는 모델 타입입니다: {model_type}")
-        
-        self.parser = PydanticOutputParser()
 
     async def run(self, user_data: Dict[str, Any], verify_data: Dict[str, Any], report_types: List[str]) -> Dict[str, Any]:
 
@@ -81,21 +92,61 @@ class LangChainService:
     async def process_analyze_by_turn(self, user_report: str, verify_report: str, prompt_type: str) -> str:
 
         # 프롬프트 템플릿 생성
-        prompt = ChatPromptTemplate.from_messages([
+        turn_compare_prompt = ChatPromptTemplate.from_messages([
             ("system", BATTLE_PROMPTS[prompt_type]["turn_compare"]),
-            ("user", "{user_report}\n\n{verify_report}")
+            ("user", "{user_turn_content}\n\n{server_turn_content}")
         ])
 
-        # 체인 생성
-        chain = LLMChain(llm=self.llm, prompt=prompt)
+        summary_prompt = ChatPromptTemplate.from_messages([
+            ("system", BATTLE_PROMPTS[prompt_type]["summary"]),
+            ("user", "Here are the turn-by-turn summaries:\n\n{turn_summaries}\n\nPlease provide a comprehensive summary of the battle analysis.")
+        ])
 
-        # 체인 실행
-        result = await chain.arun(
-            user_report=user_report,
-            verify_report=verify_report
+        translate_prompt = ChatPromptTemplate.from_messages([
+            ("system", BATTLE_PROMPTS[prompt_type]["translate"]),
+            ("user", "Please translate this battle analysis summary into Korean:\n\n{english_summary}")
+        ])
+
+        turn_compare_chain = LLMChain(llm=self.llm, prompt=turn_compare_prompt)
+
+        user_turns = self.split_turns(user_report)
+        verify_turns = self.split_turns(verify_report)
+
+        turn_summaries = []
+        for idx, ((_, user_turn_content), (_, verify_turn_content)) in enumerate(zip(user_turns, verify_turns)):
+            turn_result = await turn_compare_chain.arun(
+                turn_index=idx,
+                user_turn_content=user_turn_content,
+                server_turn_content=verify_turn_content
+            )
+            turn_summaries.append(f"[턴 {idx}] 요약:\n{turn_result}\n")
+
+        # 전체 요약 체인
+        final_summary_chain = LLMChain(
+            llm=self.llm,
+            prompt=summary_prompt,
+            output_key="english_summary"
         )
 
-        return result
+        # 한글 번역 체인
+        translate_chain = LLMChain(
+            llm=self.llm,
+            prompt=translate_prompt,
+            output_key="korean_summary"
+        )
+
+        # 시퀀셜 체인 생성
+        full_chain = SequentialChain(
+            chains=[final_summary_chain, translate_chain],
+            input_variables=["turn_summaries"],
+            output_variables=["english_summary", "korean_summary"],
+            verbose=True
+        )
+
+        # 체인 실행
+        result = await full_chain.ainvoke({"turn_summaries": "\n".join(turn_summaries)})
+
+        return f"=== Summary ===\n{result['korean_summary']}"
 
     async def process_analyze_full(self, user_report: str, verify_report: str) -> str:
 
@@ -130,11 +181,10 @@ class LangChainService:
         # 체인 실행
         result = await chain.arun(query=query)
 
-        return result
-    
+        return result    
     def split_turns(self, log_text: str):
-        """## 턴 N 기준으로 로그를 턴별로 나눔"""
-        parts = re.split(r"(## 턴 \d+)", log_text)
+        """## Turn N 기준으로 로그를 턴별로 나눔"""
+        parts = re.split(r"(## Turn \d+)", log_text)
         turns = []
         for i in range(1, len(parts), 2):
             turn_id = parts[i].strip()

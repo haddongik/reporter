@@ -143,11 +143,11 @@ def process_character_status(
             characters[code]["status"] = char_info["status"]
 
             if not old_status and char_info["status"]:
-                report.append(f"- {code}(UID:{char_info['id']}) STATUS Initialization:\n{format_status(char_info['status'])}\n")
+                report.append(f"- STATUS Initialization: {code}(UID:{char_info['id']})\n{format_status(char_info['status'])}\n")
             elif old_status != char_info["status"]:
                 status_changes = compare_status_values(old_status, char_info["status"])
                 if status_changes:
-                    report.append(f"- {code}(UID:{char_info['id']}) STATUS Changes: {status_changes}\n")
+                    report.append(f"- STATUS Changes: {code}(UID:{char_info['id']}) {status_changes}\n")
     
     # HP 정보 처리
     if report_type in ["hp", "full"]:
