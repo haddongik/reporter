@@ -62,15 +62,15 @@ def decode64_and_decompress(encoded_data: str) -> Optional[str]:
 
 def process_json_data(json_data: Dict[str, Any], header: str, key: str) -> Optional[Dict[str, Any]]:
 
-    if not json_data or header not in json_data["_source"]:
+    if not json_data or header not in json_data:
         print(f"헤더 '{header}'를 찾을 수 없습니다.")
         return None
     
-    if key not in json_data["_source"][header]:
+    if key not in json_data[header]:
         print(f"키 '{key}'를 찾을 수 없습니다.")
         return None
     
-    base64_encoded = json_data["_source"][header][key]
+    base64_encoded = json_data[header][key]
     decompressed_data = decode64_and_decompress(base64_encoded)
     
     if not decompressed_data:

@@ -3,7 +3,7 @@ from app.api.routes import router
 
 app = FastAPI(title="LangChain API Service")
 
-app.include_router(router, prefix="/api/v1")
+app.include_router(router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
