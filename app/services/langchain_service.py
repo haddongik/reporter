@@ -99,57 +99,45 @@ class LangChainService:
         return battle_report
 
     async def process_analyze_by_turn(self, user_report: str, verify_report: str, prompt_type: str) -> str:
-
+        """## 턴별 분석을 수행하고 결과를 반환합니다."""
+        # 턴별로 분리
+        user_turns = split_turns(user_report)
+        verify_turns = split_turns(verify_report)
+        
+        # 턴 비교 프롬프트 템플릿 생성
         turn_compare_prompt = ChatPromptTemplate.from_messages([
             ("system", BATTLE_PROMPTS[prompt_type]["turn_compare"]),
-            ("user", "{user_turn_content}\n\n{server_turn_content}")
+            ("user", """Turn {turn_index} Analysis:
+            Previous Turn Summary: {previous_summary}
+            User Turn Content: {user_turn_content}
+            Server Turn Content: {server_turn_content}
+            Please analyze this turn considering the previous turn's summary.""")
         ])
-
+        
+        # 요약 프롬프트 템플릿 생성
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", BATTLE_PROMPTS[prompt_type]["summary"]),
-            ("user", "Here are the turn-by-turn summaries:\n\n{turn_summaries}\n\nPlease provide a comprehensive summary of the battle analysis.")
+            ("user", """Based on the turn-by-turn analysis, provide a comprehensive summary:
+            {turn_summaries}
+            Please provide a detailed summary of the battle analysis.""")
         ])
 
         translate_prompt = ChatPromptTemplate.from_messages([
             ("system", BATTLE_PROMPTS[prompt_type]["translate"]),
-            ("user", "Please translate this battle analysis summary into Korean:\n\n{english_summary}")
+            ("user", "Please translate this battle analysis summary into Korean:\n\n{summary}")
         ])
 
-        user_turns = split_turns(user_report)
-        verify_turns = split_turns(verify_report)
-
-        turn_summaries = []
-        turn_compare_chain = LLMChain(llm=self.llm, prompt=turn_compare_prompt)
-
-        for idx, ((_, user_turn_content), (_, verify_turn_content)) in enumerate(zip(user_turns, verify_turns)):
-            try:
-                turn_result = await turn_compare_chain.arun(
-                    turn_index=idx,
-                    user_turn_content=user_turn_content,
-                    server_turn_content=verify_turn_content
-                )
-                turn_summaries.append(f"[Turn {idx}] Summary:\n{turn_result}\n")
-            except Exception as e:
-                print(f"Turn {idx} analysis error: {e}")
-                await asyncio.sleep(5)
-                try:
-                    turn_result = await turn_compare_chain.arun(
-                        turn_index=idx,
-                        user_turn_content=user_turn_content,
-                        server_turn_content=verify_turn_content
-                    )
-                    turn_summaries.append(f"[Turn {idx}] Summary:\n{turn_result}\n")
-                except Exception as e:
-                    print(f"Turn {idx} retry failed: {e}")
-                    turn_summaries.append(f"[Turn {idx}] Analysis failed\n")
-            
-            # 각 턴 분석 사이에 2초 대기
-            await asyncio.sleep(0.5)
-
-        final_summary_chain = LLMChain(
+        # 체인 생성
+        turn_compare_chain = LLMChain(
+            llm=self.llm,
+            prompt=turn_compare_prompt,
+            output_key="turn_analysis"
+        )
+        
+        summary_chain = LLMChain(
             llm=self.llm,
             prompt=summary_prompt,
-            output_key="english_summary"
+            output_key="summary"
         )
 
         translate_chain = LLMChain(
@@ -158,19 +146,67 @@ class LangChainService:
             output_key="korean_summary"
         )
 
-        full_chain = SequentialChain(
-            chains=[final_summary_chain, translate_chain],
+        # 순차적 체인 생성
+        turn_analysis_chain = SequentialChain(
+            chains=[turn_compare_chain, summary_chain],
+            input_variables=["turn_index", "user_turn_content", "server_turn_content", "previous_summary", "turn_summaries"],
+            output_variables=["turn_analysis", "summary"],
+            verbose=True
+        )
+        
+        turn_summaries = []
+        previous_summary = "No previous turn data available."
+        
+        for idx, ((_, user_turn_content), (_, verify_turn_content)) in enumerate(zip(user_turns, verify_turns)):
+            try:
+                # 현재 턴 분석
+                result = await turn_analysis_chain.ainvoke({
+                    "turn_index": idx,
+                    "user_turn_content": user_turn_content,
+                    "server_turn_content": verify_turn_content,
+                    "previous_summary": previous_summary,
+                    "turn_summaries": "\n".join(turn_summaries) if turn_summaries else "No previous turns analyzed."
+                })
+                
+                # 현재 턴의 분석 결과 저장
+                turn_summaries.append(f"[Turn {idx}] Summary:\n{result['turn_analysis']}\n")
+                
+                # 다음 턴을 위한 이전 턴 요약 업데이트
+                previous_summary = result['turn_analysis']
+                
+            except Exception as e:
+                print(f"Turn {idx} analysis error: {e}")
+                await asyncio.sleep(5)
+                try:
+                    result = await turn_analysis_chain.ainvoke({
+                        "turn_index": idx,
+                        "user_turn_content": user_turn_content,
+                        "server_turn_content": verify_turn_content,
+                        "previous_summary": previous_summary,
+                        "turn_summaries": "\n".join(turn_summaries) if turn_summaries else "No previous turns analyzed."
+                    })
+                    turn_summaries.append(f"[Turn {idx}] Summary:\n{result['turn_analysis']}\n")
+                    previous_summary = result['turn_analysis']
+                except Exception as e:
+                    print(f"Turn {idx} retry failed: {e}")
+                    turn_summaries.append(f"[Turn {idx}] Analysis failed\n")
+            
+            # 각 턴 분석 사이에 2초 대기
+            await asyncio.sleep(0.5)
+        
+        # 최종 요약 생성
+        final_analysis_chain = SequentialChain(
+            chains=[summary_chain, translate_chain],
             input_variables=["turn_summaries"],
-            output_variables=["english_summary", "korean_summary"],
+            output_variables=["korean_summary"],
             verbose=True
         )
 
-        try:
-            result = await full_chain.ainvoke({"turn_summaries": "\n".join(turn_summaries)})
-            return f"=== Summary ===\n{result['korean_summary']}"
-        except Exception as e:
-            print(f"Summary generation error: {e}")
-            return "Summary generation failed."
+        final_summary = await final_analysis_chain.ainvoke({
+            "turn_summaries": "\n".join(turn_summaries)
+        })
+        
+        return final_summary["korean_summary"]
 
     async def process_analyze_full(self, user_report: str, verify_report: str) -> str:
 
