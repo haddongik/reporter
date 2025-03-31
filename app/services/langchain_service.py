@@ -192,7 +192,7 @@ class LangChainService:
                     turn_summaries.append(f"[Turn {idx}] Analysis failed\n")
             
             # 각 턴 분석 사이에 2초 대기
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.5)
         
         # 최종 요약 생성
         final_analysis_chain = SequentialChain(
