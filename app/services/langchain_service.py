@@ -123,7 +123,7 @@ class LangChainService:
         ])
 
         translate_prompt = ChatPromptTemplate.from_messages([
-            ("system", BATTLE_PROMPTS[prompt_type]["translate"]),
+            ("system", BATTLE_PROMPTS["TRANSLATE"]),
             ("user", "Please translate this battle analysis summary into Korean:\n\n{summary}")
         ])
 
