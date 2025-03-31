@@ -1,6 +1,11 @@
 import os
 from typing import TypedDict, Literal
 
+class BattleVerifierServerConfig():
+    protocol: str
+    host: str
+    port: int
+
 class OpenAIConfig(TypedDict, total=False):
     api_key: str | None
     model: str
@@ -17,25 +22,28 @@ class ClaudeConfig(TypedDict, total=False):
     temperature: float
 
 class AppConfig(TypedDict):
-    model_type: Literal["local", "openai", "gemini", "claude"]
     openai: OpenAIConfig
     gemini: GeminiConfig
     claude: ClaudeConfig
 
 DEFAULT_CONFIG: AppConfig = {
-    "model_type": "local",
+    "battle_verifier": {
+        "protocol": "http",
+        "host": "localhost",
+        "port": 3000,
+    },
     "openai": {
-        "api_key": None,
+        "api_key": "",
         "model": "gpt-4o", #gpt-4.5-preview
         "temperature": 0.7,
     },
     "gemini": {
-        "api_key": None,
+        "api_key": "",
         "model": "gemini-2.0-flash", #gemini-2.5-pro-exp-03-25
         "temperature": 0.7,
     },
     "claude": {
-        "api_key": None,
+        "api_key": "",
         "model": "claude-3-7-sonnet-max",
         "temperature": 0.7,
     }
@@ -43,15 +51,18 @@ DEFAULT_CONFIG: AppConfig = {
 
 def load_config() -> AppConfig:
     config = DEFAULT_CONFIG.copy()
+    config["battle_verifier"] = config["battle_verifier"].copy()
     config["openai"] = config["openai"].copy()
     config["gemini"] = config["gemini"].copy()
     config["claude"] = config["claude"].copy()
 
-    # 모델 타입 설정
-    if "MODEL_TYPE" in os.environ:
-        model_type = os.environ["MODEL_TYPE"]
-        if model_type in ["local", "openai", "gemini", "claude"]:
-            config["model_type"] = model_type
+    # Battle Verifier 설정
+    if "BATTLE_VERIFIER_PROTOCOL" in os.environ:
+        config["battle_verifier"]["protocol"] = os.environ["BATTLE_VERIFIER_PROTOCOL"]
+    if "BATTLE_VERIFIER_HOST" in os.environ:
+        config["battle_verifier"]["host"] = os.environ["BATTLE_VERIFIER_HOST"]
+    if "BATTLE_VERIFIER_PORT" in os.environ:
+        config["battle_verifier"]["port"] = int(os.environ["BATTLE_VERIFIER_PORT"])
 
     # OpenAI 설정
     if "OPENAI_API_KEY" in os.environ:
