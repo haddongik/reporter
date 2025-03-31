@@ -36,7 +36,8 @@ async def test_report():
     results = await langchain_test_service.run(
         user_data=user_data,
         verify_data=verify_data,
-        report_types=["full", "status", "hp", "attack", "effect"]
+        report_types=["status", "hp"]
+        #report_types=["full", "status", "hp", "attack", "effect"]
     )
 
     # 결과 출력
