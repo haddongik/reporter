@@ -83,10 +83,10 @@ BATTLE_PROMPTS = {
 
             ### 입력 예시:
             User Turn Log:
-            {user_turn_log}
+            (실제 유저 턴 로그)
 
             Server Turn Log:
-            {server_turn_log}
+            (실제 서버 턴 로그)
         """,
         "summary":
 		"""
