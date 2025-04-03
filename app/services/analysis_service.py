@@ -10,10 +10,10 @@ def get_callback_url() -> str:
     verifier_config = app_config["battle_verifier"]
     return f"{verifier_config['protocol']}://{verifier_config['host']}:{verifier_config['port']}/api/report_gen_finish"
 
-async def process_analysis_in_background(task_id: str, elk_id: str, ai_model: str, data: dict, callback_api: str):
+async def process_analysis_in_background(task_id: str, elk_id: str, ai_model: str, battle_data: dict, callback_api: str):
     try:
-        user_data = make_analysis_data(data['battle_data'], "result_info", "user_record_minimal")
-        verify_data = make_analysis_data(data['battle_data'], "result_info", "verify_record_minimal")
+        user_data = make_analysis_data(battle_data, "result_info", "user_record_minimal")
+        verify_data = make_analysis_data(battle_data, "result_info", "verify_record_minimal")
         
         # 분석 서비스 초기화
         langchain_service = LangChainService(model_type=ai_model)

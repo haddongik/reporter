@@ -6,6 +6,7 @@ from app.services.analysis_service import process_analysis_in_background
 from typing import Dict
 import httpx
 import uuid
+import json
 from datetime import datetime
 from app.utils.task_manager import init_task_status, get_task_status
 
@@ -29,6 +30,7 @@ async def analysis(data: dict, background_tasks: BackgroundTasks):
     task_id = str(uuid.uuid4())
     elk_id = data.get("elk_id", "")
     ai_model = data.get("ai_model", "")
+    battle_data = json.loads( data.get("battle_data", {}) )
     
     # 작업 상태 초기화
     init_task_status(task_id)
@@ -39,7 +41,7 @@ async def analysis(data: dict, background_tasks: BackgroundTasks):
         task_id=task_id,
         elk_id=elk_id,
         ai_model=ai_model,
-        data=data,
+        battle_data=battle_data,
         callback_api=""
     )
     
