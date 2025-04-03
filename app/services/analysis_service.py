@@ -22,7 +22,7 @@ async def process_analysis_in_background(task_id: str, elk_id: str, ai_model: st
         result = await langchain_service.run(
             user_data=user_data,
             verify_data=verify_data,
-            report_types=["status", "hp"]
+            report_types=["status", "hp", "attack"]
         )
         
         # 콜백 API 호출

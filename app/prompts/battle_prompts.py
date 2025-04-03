@@ -100,8 +100,7 @@ BATTLE_PROMPTS = {
 
             ### 분석 대상:
             - 각 턴은 공격자의 행동(Action)과 공격 결과 로그들로 구성된다.
-            - 로그 항목은 다음과 같은 형식을 따른다:
-            {공격자} deals {데미지 수치} damage to {피해자} [Effect: {효과}]
+            - 로그 항목은 다음과 같은 형식을 따른다: (공격자) deals (데미지 수치) damage to (피해자) [Effect: (효과)]
 
             ### 분석 목적:
             - 유저 로그와 서버 로그를 턴 단위로 비교하여 공격 로그가 일치하는지 확인한다.
@@ -136,10 +135,10 @@ BATTLE_PROMPTS = {
 
             ### 입력 예시:
             User Turn Log:
-            {user_turn_log}
+            (실제 유저 턴 로그)
 
             Server Turn Log:
-            {server_turn_log}
+            (실제 서버 턴 로그)
         """,
         "summary":
 		"""
