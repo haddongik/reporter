@@ -10,13 +10,13 @@ def get_callback_url() -> str:
     verifier_config = app_config["battle_verifier"]
     return f"{verifier_config['protocol']}://{verifier_config['host']}:{verifier_config['port']}/api/report_gen_finish"
 
-async def process_analysis_in_background(task_id: str, elk_id: str, ai_model: str, battle_data: dict, callback_api: str):
+async def process_analysis_in_background(task_id: str, elk_id: str, provider: str, model: str, temperature: float, battle_data: dict, callback_api: str):
     try:
         user_data = make_analysis_data(battle_data, "result_info", "user_record_minimal")
         verify_data = make_analysis_data(battle_data, "result_info", "verify_record_minimal")
         
         # 분석 서비스 초기화
-        langchain_service = LangChainService(model_type=ai_model)
+        langchain_service = LangChainService(provider=provider, model=model, temperature=temperature)
         
         # 분석 실행
         result = await langchain_service.run(
@@ -31,7 +31,9 @@ async def process_analysis_in_background(task_id: str, elk_id: str, ai_model: st
             await client.post(callback_url, json={
                 "task_id": task_id,
                 "elk_id": elk_id,
-                "ai_model": ai_model,
+                "provider": provider,
+                "ai_model": model,
+                "temperature": temperature,
                 "status": "completed",
                 "result": result
             })
@@ -46,7 +48,9 @@ async def process_analysis_in_background(task_id: str, elk_id: str, ai_model: st
             await client.post(callback_url, json={
                 "task_id": task_id,
                 "elk_id": elk_id,
-                "ai_model": ai_model,
+                "provider": provider,
+                "ai_model": model,
+                "temperature": temperature,
                 "status": "failed",
                 "error": str(e)
             })

@@ -30,7 +30,7 @@ async def test_report():
     verify_data = make_analysis_data(json_data, "result_info", "verify_record_minimal")
 
     # LangChainService 인스턴스 생성
-    langchain_test_service = LangChainService( model_type="openai" )
+    langchain_test_service = LangChainService( provider="openai", model="gpt-4o", temperature=0.7 )
 
     # 리포트 생성 및 분석 실행
     results = await langchain_test_service.run(
@@ -48,7 +48,7 @@ async def test_report():
 async def test_chat():
 
     # LangChainService 인스턴스 생성
-    langchain_test_service = LangChainService( model_type="openai" )
+    langchain_test_service = LangChainService( provider="openai", model="gpt-4o", temperature=0.7 )
     
     test_queries = [
         "안녕하세요! 간단한 테스트입니다.",

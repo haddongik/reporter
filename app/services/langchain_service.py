@@ -14,35 +14,38 @@ from app.config.app_config import app_config  # 설정 파일 import
 
 class LangChainService:
     
-    def __init__( self, model_type: Literal["local", "openai", "gemini", "claude"] = "local" ):
+    def __init__(self, provider: Literal["local", "openai", "gemini", "claude"], model: str, temperature: float):
 
-        # gemini 2.5, claude 3.7 sonnet max, gpt 4-turbo
-        self.model_type = model_type
-        if model_type == "local":
+        self.provider = provider
+        self.model = model
+        self.temperature = temperature
+        
+        # LLM 초기화
+        if provider == "local":
             self.llm = Ollama(
-                model="deepseek-r1:14b",
+                model=self.model,
                 base_url="http://localhost:11434"
             )
-        elif model_type == "openai":
+        elif provider == "openai":
             self.llm = ChatOpenAI(
-                model=app_config["openai"]["model"],
-                temperature=app_config["openai"]["temperature"],
+                model=self.model,
+                temperature=self.temperature,
                 openai_api_key=app_config["openai"]["api_key"]
             )
-        elif model_type == "gemini":
+        elif provider == "gemini":
             self.llm = ChatGoogleGenerativeAI(
-                model=app_config["gemini"]["model"],
-                temperature=app_config["gemini"]["temperature"],
+                model=self.model,
+                temperature=self.temperature,
                 google_api_key=app_config["gemini"]["api_key"]
             )
-        elif model_type == "claude":
+        elif provider == "claude":
             self.llm = ChatAnthropic(
-                model=app_config["claude"]["model"],
-                temperature=app_config["claude"]["temperature"],
+                model=self.model,
+                temperature=self.temperature,
                 anthropic_api_key=app_config["claude"]["api_key"]
             )
         else:
-            raise ValueError(f"지원하지 않는 모델 타입입니다: {model_type}")
+            raise ValueError(f"지원하지 않는 모델 제공자입니다: {provider}")
 
     async def run(self, user_data: Dict[str, Any], verify_data: Dict[str, Any], report_types: List[str]) -> Dict[str, Any]:
         # 각 리포트 타입에 대한 리포트 생성 및 분석 태스크 생성
