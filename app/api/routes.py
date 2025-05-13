@@ -11,7 +11,6 @@ from datetime import datetime
 from app.utils.task_manager import init_task_status, get_task_status
 
 router = APIRouter()
-langchain_service = LangChainService( provider="openai", model="gpt-4o", temperature=0.7 )
 
 # 작업 상태를 저장할 딕셔너리
 task_status: Dict[str, Dict] = {}
@@ -22,8 +21,8 @@ async def ping(request: PingRequest):
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
-    response = await langchain_service.process_chat(request.query)
-    return {"response": response}
+    #response = await langchain_service.process_chat(request.query)
+    return {"response": "ok"}
 
 @router.post("/analysis")
 async def analysis(data: dict, background_tasks: BackgroundTasks):

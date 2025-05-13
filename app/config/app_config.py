@@ -9,17 +9,17 @@ class BattleVerifierServerConfig():
 class OpenAIConfig(TypedDict, total=False):
     api_key: str | None
 
-class GeminiConfig(TypedDict, total=False):
+class GoogleConfig(TypedDict, total=False):
     api_key: str | None
 
-class ClaudeConfig(TypedDict, total=False):
+class AnthropicConfig(TypedDict, total=False):
     api_key: str | None
 
 class AppConfig(TypedDict):
     battle_verifier: BattleVerifierServerConfig
     openai: OpenAIConfig
-    gemini: GeminiConfig
-    claude: ClaudeConfig
+    google: GoogleConfig
+    anthropic: AnthropicConfig
 
 DEFAULT_CONFIG: AppConfig = {
     "battle_verifier": {
@@ -30,10 +30,10 @@ DEFAULT_CONFIG: AppConfig = {
     "openai": {
         "api_key": ""
     },
-    "gemini": {
+    "google": {
         "api_key": ""
     },
-    "claude": {
+    "anthropic": {
         "api_key": ""
     }
 }
@@ -54,13 +54,13 @@ def load_config() -> AppConfig:
     if "OPENAI_API_KEY" in os.environ:
         config["openai"]["api_key"] = os.environ["OPENAI_API_KEY"]
 
-    # Gemini 설정
+    # Google 설정
     if "GOOGLE_API_KEY" in os.environ:
-        config["gemini"]["api_key"] = os.environ["GOOGLE_API_KEY"]
+        config["google"]["api_key"] = os.environ["GOOGLE_API_KEY"]
 
-    # Claude 설정
+    # Anthropic 설정
     if "ANTHROPIC_API_KEY" in os.environ:
-        config["claude"]["api_key"] = os.environ["ANTHROPIC_API_KEY"]
+        config["anthropic"]["api_key"] = os.environ["ANTHROPIC_API_KEY"]
     
     return config
 

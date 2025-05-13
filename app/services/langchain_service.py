@@ -14,7 +14,7 @@ from app.config.app_config import app_config  # 설정 파일 import
 
 class LangChainService:
     
-    def __init__(self, provider: Literal["local", "openai", "gemini", "claude"], model: str, temperature: float):
+    def __init__(self, provider: Literal["local", "openai", "google", "anthropic"], model: str, temperature: float):
 
         self.provider = provider
         self.model = model
@@ -32,17 +32,17 @@ class LangChainService:
                 temperature=self.temperature,
                 openai_api_key=app_config["openai"]["api_key"]
             )
-        elif provider == "gemini":
+        elif provider == "google":
             self.llm = ChatGoogleGenerativeAI(
                 model=self.model,
                 temperature=self.temperature,
-                google_api_key=app_config["gemini"]["api_key"]
+                google_api_key=app_config["google"]["api_key"]
             )
-        elif provider == "claude":
+        elif provider == "anthropic":
             self.llm = ChatAnthropic(
                 model=self.model,
                 temperature=self.temperature,
-                anthropic_api_key=app_config["claude"]["api_key"]
+                anthropic_api_key=app_config["anthropic"]["api_key"]
             )
         else:
             raise ValueError(f"지원하지 않는 모델 제공자입니다: {provider}")
@@ -195,7 +195,7 @@ class LangChainService:
                     turn_summaries.append(f"[Turn {idx}] Analysis failed\n")
             
             # 각 턴 분석 사이에 2초 대기
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(2)
         
         # 최종 요약 생성
         final_analysis_chain = SequentialChain(
