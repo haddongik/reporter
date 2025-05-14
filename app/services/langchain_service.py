@@ -7,10 +7,18 @@ from langchain.chains import LLMChain, SequentialChain
 from langchain.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_anthropic import ChatAnthropic
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
 from app.prompts.battle_prompts import BATTLE_PROMPTS
 from battle_report import generate_battle_report
 from app.utils.app_utils import split_turns
 from app.config.app_config import app_config  # 설정 파일 import
+
+class SummaryTopic(BaseModel):
+    topic: str = Field(description="The topic of the summary")
+    summary: str = Field(description="The summary of the topic")
+    key_differences: str = Field(description="The key differences between the user and server")
+    opinion: str = Field(description="The opinion of the summary and the key differences")
 
 class LangChainService:
     
@@ -195,21 +203,68 @@ class LangChainService:
                     turn_summaries.append(f"[Turn {idx}] Analysis failed\n")
             
             # 각 턴 분석 사이에 2초 대기
-            await asyncio.sleep(2)
+            await asyncio.sleep(30)
         
         # 최종 요약 생성
-        final_analysis_chain = SequentialChain(
-            chains=[summary_chain, translate_chain],
-            input_variables=["turn_summaries"],
-            output_variables=["korean_summary"],
-            verbose=True
-        )
+        # final_analysis_chain = SequentialChain(
+        #    chains=[summary_chain, translate_chain],
+        #    input_variables=["turn_summaries"],
+        #    output_variables=["korean_summary"],
+        #    verbose=True
+        # )
 
-        final_summary = await final_analysis_chain.ainvoke({
-            "turn_summaries": "\n".join(turn_summaries)
-        })
+        # final_summary = await final_analysis_chain.ainvoke({
+        #    "turn_summaries": "\n".join(turn_summaries)
+        # })
+
+        print("turn_summaries 내용:", turn_summaries)  # 디버깅을 위해 추가
+
+        json_parser = JsonOutputParser(pydantic_object=SummaryTopic)
+        json_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert in battle log and security analysis.
+            You must respond in the following JSON format:
+            {{
+                "topic": "주제",
+                "summary": "요약",
+                "key_differences": "주요 차이점",
+                "opinion": "의견"
+            }}
+            IMPORTANT: Your response must be valid JSON with all fields present."""),
+            ("user", """Based on the turn-by-turn analysis, provide a comprehensive summary:
+            {turn_summaries}
+            Please provide a detailed summary of the battle analysis.""")
+        ])
+
+        # 파서의 형식 지시사항 확인
+        format_instructions = json_parser.get_format_instructions()
+        print("파서 형식 지시사항:", format_instructions)  # 디버깅을 위해 추가
+
+        json_prompt = json_prompt.partial(format_instructions=format_instructions)
+        json_chain = json_prompt | self.llm
+
+        try:
+            raw_response = await json_chain.ainvoke({"turn_summaries": "\n".join(turn_summaries)})
+            print("LLM 원본 응답:", raw_response)  # 디버깅을 위해 추가
+        except Exception as e:
+            print(f"에러 발생: {str(e)}")
+            return None
+
+        try:
+            # AIMessage 객체에서 content만 추출
+            json_content = raw_response.content       
+            # JSON 문자열에서 ```json과 ``` 제거
+            json_content = json_content.replace('```json', '').replace('```', '').strip()
+            # JSON 파싱
+            json_result = json_parser.parse(json_content)
+            print(json_result)
+        except ValueError as e:
+            print(f"JSON 파싱 에러: {str(e)}")
+            return None
+        except Exception as e:
+            print(f"예상치 못한 에러: {str(e)}")
+            return None
         
-        return final_summary["korean_summary"]
+        return json_result
 
     async def process_analyze_full(self, user_report: str, verify_report: str) -> str:
 
